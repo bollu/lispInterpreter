@@ -1,0 +1,43 @@
+#include <stdio.h>
+#include <string>
+#include <stdint.h>
+
+typedef char * lStr;
+typedef int lInt;
+typedef float lFloat;
+
+typedef int64_t i64;
+typedef int32_t i32;
+typedef float f32;
+
+enum TokenType {
+	TokenOpenBrace,
+	TokenCloseBrace,
+	TokenAtom,
+};
+
+struct Token {
+	TokenType type;
+	char *name;
+};
+
+
+struct Tokenizer {
+	std::string data;
+	std::string current_string;
+ 
+	struct {
+		i64 pos_line_number;
+		i64 pos_in_line;
+	} seek;
+  
+};
+
+Token getNextToken(Tokenizer &tokenizer) {
+	
+}
+
+int main() {
+   
+	return 0;
+}
