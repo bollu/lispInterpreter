@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iostream>
 
+
 typedef char * lStr;
 typedef int lInt;
 typedef float lFloat;
