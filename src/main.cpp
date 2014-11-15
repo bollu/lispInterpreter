@@ -25,7 +25,7 @@ struct Token {
 
     Flag flags;
     std::string value;
-     
+
     static Token new_open_brace() {
         Token t;
         t.flags = Token::TOKEN_TYPE_OPEN_BRACE;
@@ -70,7 +70,7 @@ std::string token_debug_string(const Token &token) {
         return "CloseBrace";
     }
     else if(token.flags & Token::TOKEN_TYPE_ATOM) {
-        return "Atom: \'" + token.value + "\'";
+        return "Atom: " + token.value + "";
     }
 
     return "UNKNOWN TOKEN TYPE";
@@ -81,12 +81,31 @@ std::deque<Token> tokenize(std::string data) {
     std::string current_string;
 
     bool string_build_ended = false;
+    bool parsing_string = false;
 
     for(auto it = data.begin(); it != data.end(); ++it) {
         char ch = *it;
 
-        if(ch == ' ' || ch == '\t' || ch == '\n') {
+        if((ch == ' ' || ch == '\t' || ch == '\n') && !parsing_string) {
             string_build_ended = true;
+        }
+        else if(ch == '\"') {
+            if(parsing_string) { 
+                parsing_string = false; 
+                string_build_ended = true; 
+                current_string.push_back(ch); 
+            }
+            else { 
+                if(current_string.size() > 0) {
+                    string_build_ended = true;
+                    parsing_string = false;
+                    --it;
+                } else { 
+                    string_build_ended = false;
+                    parsing_string = true;
+                    current_string.push_back(ch);
+                }
+            }
         }
 
         //the string is ONLY an ( or a ), so we gotta break
@@ -122,64 +141,64 @@ std::deque<Token> tokenize(std::string data) {
 }
 
 /*
-class TokenStream {
-        std::vector<Token> tokens;
-        int position;
+   class TokenStream {
+   std::vector<Token> tokens;
+   int position;
 
-    public:
-        TokenStream(std::vector<Token> tokens) : tokens(tokens), position(0) {};
-        
-        void pop() {
-            position++;
-            assert((position < this->tokens.size()) && "error: ran out of tokens");
-        }
-        Token peek() { return tokens[position]; }
+   public:
+   TokenStream(std::vector<Token> tokens) : tokens(tokens), position(0) {};
 
-        void rewind() { position--; }
+   void pop() {
+   position++;
+   assert((position < this->tokens.size()) && "error: ran out of tokens");
+   }
+   Token peek() { return tokens[position]; }
 
-};
-*/
+   void rewind() { position--; }
+
+   };
+   */
 
 struct AST {
     private:
-    AST() { this->flags = 0; this->value = ""; };
-    
+        AST() { this->flags = 0; this->value = ""; };
+
     public:
 
-    enum ASTFlags {
-        AST_NODE_TYPE_NONTERMINAL = 2,
-        AST_NODE_TYPE_TERMINAL = 4,
-    };
+        enum ASTFlags {
+            AST_NODE_TYPE_NONTERMINAL = 1<<1,
+            AST_NODE_TYPE_TERMINAL = 1<<2,
+        };
 
-    std::string value;
-    Flag flags;
-    std::vector<AST> children;
-    
-   void mut_add_child(AST &child) {
-        this->children.push_back(child);
-    }
+        std::string value;
+        Flag flags;
+        std::vector<AST> children;
 
-    static AST new_terminal_node(std::string value) {
-        AST ast;
-        ast.flags = AST_NODE_TYPE_TERMINAL;
-        ast.value = value;
+        void mut_add_child(AST &child) {
+            this->children.push_back(child);
+        }
 
-        return ast;
-    }
+        static AST new_terminal_node(std::string value) {
+            AST ast;
+            ast.flags = AST_NODE_TYPE_TERMINAL;
+            ast.value = value;
 
-    static AST new_nonterminal_node() {
-        AST ast;
-        ast.flags = AST_NODE_TYPE_NONTERMINAL;
+            return ast;
+        }
 
-        return ast;
-    }
+        static AST new_nonterminal_node() {
+            AST ast;
+            ast.flags = AST_NODE_TYPE_NONTERMINAL;
+
+            return ast;
+        }
 };
 
 std::string ast_debug_string(const AST &ast) {
     if(ast.flags & AST::AST_NODE_TYPE_TERMINAL) {
         return ast.value;
     };
-   
+
     std::string debug_string = "[ ";
 
     for(auto child : ast.children) {
@@ -200,7 +219,7 @@ AST __ast_from_tokens(std::deque<Token> &tokens) {
 
     auto head = tokens[0];
     tokens.pop_front();
-    
+
 
     if(head.flags & Token::TOKEN_TYPE_ATOM) {
         AST child = AST::new_terminal_node(head.value);
@@ -212,7 +231,7 @@ AST __ast_from_tokens(std::deque<Token> &tokens) {
 
             auto token = tokens[0];
             tokens.pop_front();
-            
+
             if(token.flags & Token::TOKEN_TYPE_CLOSE_BRACE) {
                 return parent;
             } else {
@@ -246,6 +265,7 @@ struct Value {
         VALUE_TYPE_FLOAT = 1<<2,
         VALUE_TYPE_STRING = 1<<3,
         VALUE_TYPE_LIST = 1<<4,
+        VALUE_TYPE_VARIABLE = 1<<5,
     };
 
     long long i;
@@ -254,37 +274,45 @@ struct Value {
     std::vector<Value> list;
 
     Flag flags;
-    
+
     private:
-        Value() {
-            this->i = -42;
-            this->f = -42;
-            this->s = "INVALID VALUE";
-        };
+    Value() {
+        this->i = -42;
+        this->f = -42;
+        this->s = "INVALID VALUE";
+    };
 
 
     public:
-    
+
     static Value new_int(int i) { 
         Value v;
         v.flags = VALUE_TYPE_INT;
         v.i = i;
         return v;
     }
-    
+
     static Value new_float(float f) { 
         Value v;
         v.flags = VALUE_TYPE_FLOAT;
         v.f = f; 
         return v;
     }
-    
+
     static Value new_string(std::string s) { 
         Value v;
         v.flags = VALUE_TYPE_STRING;
         v.s = s;
         return v;
     }
+
+    static Value new_variable(std::string s) { 
+        Value v;
+        v.flags = VALUE_TYPE_VARIABLE;
+        v.s = s;
+        return v;
+    }
+
     static Value new_list(std::vector<AST> list_members) {
 
         Value v;
@@ -294,76 +322,124 @@ struct Value {
         };
         return v;
     }
+    static Value new_list(std::vector<Value> list_members) {
+
+        Value v;
+        v.flags = VALUE_TYPE_LIST;
+        for(auto member: list_members) {
+            v.list.push_back(member);
+        };
+        return v;
+    }
+
 };
 
-typedef int (*Value_arith_op_int)(int a, int b);
-typedef float (*Value_arith_op_float)(float a, float b);
+typedef int (*arith_op_int)(int a, int b);
+typedef float (*arith_op_float)(float a, float b);
 
-Value apply_value_arith_op(Value &value1, Value &value2, 
-        Value_arith_op_int op_int,
-        Value_arith_op_float op_float) {
+struct Interpreter; //forward decl
+Value eval(Value to_eval, Interpreter &interpreter); //forward decl
+Value apply_binary_op(Value eval_list, Interpreter &interpreter, arith_op_int op_int, arith_op_float op_float) {
 
-    float f = 0;
-    int i = 0;
+    //binary operator - has 3 things - the operator and two parameters
+    assert(eval_list.flags & Value::VALUE_TYPE_LIST);
+    assert(eval_list.list.size() == 3);
 
-    bool is_int = true;
+    auto value1 = eval(eval_list.list[1], interpreter);
+    auto value2 = eval(eval_list.list[2], interpreter);
 
-    if(value1.flags & Value::VALUE_TYPE_INT) {
-        i += value1.i;
-        f += value1.i;
-    } else if (value1.flags & Value::VALUE_TYPE_FLOAT) {
-        i += value1.f;
-        f += value1.f;
-        is_int = false;
-    }
+    if((value1.flags & Value::VALUE_TYPE_INT) && (value2.flags & Value::VALUE_TYPE_INT)) {
+        std::cout<<"\n\tval1 i: "<<value1.i<<" | val2 i: "<<value2.i;
 
-    if(value2.flags & Value::VALUE_TYPE_INT) {
-        i += value2.i;
-        f += value2.i;
-    } else if (value2.flags & Value::VALUE_TYPE_FLOAT) {
-        f += value2.f;
-        i += value2.f;
-        is_int = false;
-    }
-
-    if(is_int) {
-        return Value::new_int(i);
+        int result = op_int(value1.i, value2.i);
+        std::cout<<"\n\tresult: "<<result;
+        return Value::new_int(result);
     } else {
-        return Value::new_float(f);
-    }
+        float f1;
+        if(value1.flags & Value::VALUE_TYPE_INT) {
+            f1 = value1.i;
+        } else if (value1.flags & Value::VALUE_TYPE_FLOAT) {
+            f1 = value1.f;
+        } else {
+            assert(false && "first parameter is not a number");
+        }
 
+        float f2;
+        if(value2.flags & Value::VALUE_TYPE_INT) {
+            f2 = value2.i;
+        } else if (value2.flags & Value::VALUE_TYPE_FLOAT) {
+            f2 = value2.f;
+        } else {
+            assert(false && "second parameter is not a number");
+        }
+
+        return Value::new_float(op_float(f1, f2));
+    }   
 }
+
+template<typename T>
+T add_binary_op(T var1, T var2) {
+    return var1 + var2;
+}
+
+template<typename T>
+T sub_binary_op(T var1, T var2) {
+    return var1 - var2;
+}
+
+template<typename T>
+T mult_binary_op(T var1, T var2) {
+    return var1 * var2;
+}
+
+
+template<typename T>
+T div_binary_op(T var1, T var2) {
+    return var1 / var2;
+}
+
+
+template<typename T>
+T mod_binary_op(T var1, T var2) {
+    return var1 % var2;
+}
+
+
+
+
+
 
 Value value_from_ast(const AST &ast) {
 
+    std::string value = ast.value;
     if(ast.flags & AST::AST_NODE_TYPE_TERMINAL) {
-        
+
         std::stringstream ss;
-        
-        //int 
-        ss<<ast.value;
+        ss.str(value);
         int i; ss>>std::noskipws>>i;
 
         if(!ss.fail() && ss.eof()) {
             return Value::new_int((int)i);
         }
-    
+
         //float
-        ss.clear(); ss.str(std::string());
-        ss<<ast.value;
+        ss.clear();
+        ss.str(value);
         float f; ss>>f;
-        
+
         if(!ss.fail() && ss.eof()) {
             return Value::new_float((float)f);           
         }
-       
-        //string
-        ss.clear(); ss.str(std::string());
-        ss<<ast.value;
-        std::string s;
-        ss>>s;
 
-        return Value::new_string(s);
+        //string
+        if(value.front() == '\"' && value.back()  == '\"') {
+            return Value::new_string(std::string(value.begin() + 1, value.end() - 1));
+        }
+
+        //variable
+        return Value::new_variable(value);    
+
+
 
     }
     else {
@@ -387,12 +463,22 @@ std::string value_debug_string(const Value &value) {
 
         return ss.str();
     }
+
+    if(value.flags & Value::VALUE_TYPE_VARIABLE) {
+        std::stringstream ss;
+        ss<<"value variable: |"<<value.s<<"|";
+
+        return ss.str();
+
+    }
+
+
     if(value.flags & Value::VALUE_TYPE_LIST) {
         std::stringstream ss;
         ss<<"value list: {";
-        
+
         for(auto child : value.list) {
-           ss<<" "<<value_debug_string(child); 
+            ss<<" "<<value_debug_string(child); 
         }
         ss<<"}";
 
@@ -417,32 +503,32 @@ struct Environment {
     Environment *outer;
 
     public:
-        Environment(Environment *outer) {
-            this->outer = outer;
-        }
+    Environment(Environment *outer) {
+        this->outer = outer;
+    }
 
-        Value get_symbol(std::string symbol_name) {
-            auto value_it = this->symbol_table.find(symbol_name);
+    Value get_symbol(std::string symbol_name) {
+        auto value_it = this->symbol_table.find(symbol_name);
 
-            if(value_it == this->symbol_table.end()) {
-                if(this->outer == NULL) {
-                    std::cout<<"unable to find symbol: "<<symbol_name;
-                    assert(false && "symbol not found");
-                }
-                else {
-                    return this->outer->get_symbol(symbol_name);
-                }
+        if(value_it == this->symbol_table.end()) {
+            if(this->outer == NULL) {
+                std::cout<<"unable to find symbol: "<<symbol_name;
+                assert(false && "symbol not found");
             }
             else {
-                return value_it->second;
+                return this->outer->get_symbol(symbol_name);
             }
-
         }
+        else {
+            return value_it->second;
+        }
+
+    }
 };
 
 struct Interpreter {
-   Environment global_envt;
-   Environment *current_envt;
+    Environment global_envt;
+    Environment *current_envt;
 
     Interpreter() : global_envt(NULL) {
         this->current_envt = NULL;
@@ -464,95 +550,84 @@ Value eval(Value to_eval, Interpreter &interpreter) {
 
     if(to_eval.flags & Value::VALUE_TYPE_LIST) {
         //normal forms and special forms go here
-            
+
         //index 0 must be a function name
-        assert(to_eval.list[0].flags & Value::VALUE_TYPE_STRING);
+        assert(to_eval.list[0].flags & Value::VALUE_TYPE_VARIABLE);
         std::string function_name = to_eval.list[0].s;
-        
+
 
         if(function_name == "+") {
-            assert(to_eval.list.size() == 3);
-            
-            Value value1 = eval(to_eval.list[1], interpreter);
-            Value value2 = eval(to_eval.list[2], interpreter);
-    
-           float f = 0;
-           int i = 0;
+            assert(to_eval.list.size() == 3 && "+ requires 2 operands");
+            return apply_binary_op(to_eval, interpreter, add_binary_op<int>, add_binary_op<float>);       
 
-           bool is_int = true;
-
-           if(value1.flags & Value::VALUE_TYPE_INT) {
-                i += value1.i;
-                f += value1.i;
-           } else if (value1.flags & Value::VALUE_TYPE_FLOAT) {
-               i += value1.f;
-               f += value1.f;
-               is_int = false;
-           }
-
-           if(value2.flags & Value::VALUE_TYPE_INT) {
-                i += value2.i;
-                f += value2.i;
-           } else if (value2.flags & Value::VALUE_TYPE_FLOAT) {
-               f += value2.f;
-               i += value2.f;
-               is_int = false;
-           }
-
-           if(is_int) {
-                return Value::new_int(i);
-           } else {
-                return Value::new_float(f);
-           }
         } 
         else if(function_name == "-") {
-            assert(to_eval.list.size() == 3);
-            
-            Value value1 = eval(to_eval.list[1], interpreter);
-            Value value2 = eval(to_eval.list[2], interpreter);
+            assert(to_eval.list.size() == 3 && "- requires 2 operands");
+            return apply_binary_op(to_eval, interpreter, sub_binary_op<int>, sub_binary_op<float>);       
+        }
+        if(function_name == "*") {
+            assert(to_eval.list.size() == 3 && "+ requires 2 operands");
+            return apply_binary_op(to_eval, interpreter, mult_binary_op<int>, mult_binary_op<float>);       
+
+        } 
+        else if(function_name == "/") {
+            assert(to_eval.list.size() == 3 && "- requires 2 operands");
+            return apply_binary_op(to_eval, interpreter, div_binary_op<int>, div_binary_op<float>);       
+        }
+        else if(function_name == "%") {
+            assert(to_eval.list.size() == 3 && "- requires 2 operands");
+            assert((to_eval.list[1].flags & Value::VALUE_TYPE_INT));
+            assert((to_eval.list[2].flags & Value::VALUE_TYPE_INT));
+
+
+            return Value::new_int(to_eval.list[1].i % to_eval.list[2].i);
+        }
+        
+        else if(function_name == "freeze") {
+            assert(to_eval.list.size() == 2 && "requires 1 operand");
+            assert(to_eval.list[1].flags & Value::VALUE_TYPE_LIST);
+
+            return to_eval.list[1];
+        }
     
-           float f = 0;
-           int i = 0;
+        else if (function_name == "car") {
+            assert(to_eval.list.size() == 2 && "requires 1 operand");
+            assert(to_eval.list[1].flags & Value::VALUE_TYPE_LIST);
 
-           bool is_int = true;
+       
+            Value list_param = to_eval.list[1];
+            Value car = list_param.list[0];
+            return car;
+        }
+        else if(function_name == "cdr") {
+             assert(to_eval.list.size() == 2 && "requires 1 operand");
+            assert(to_eval.list[1].flags & Value::VALUE_TYPE_LIST);
 
-           if(value1.flags & Value::VALUE_TYPE_INT) {
-                i += value1.i;
-                f += value1.i; 
-           } else if (value1.flags & Value::VALUE_TYPE_FLOAT) {
-               f += value1.f;
-               is_int = false;
-           }
+            Value list_param = to_eval.list[1];
+            std::vector<Value> cdr(list_param.list.begin() + 1, list_param.list.end());
+            
+            return Value::new_list(cdr);
 
-           if(value2.flags & Value::VALUE_TYPE_INT) {
-                i -= value2.i;
-                f -= value2.i;
-           } else if (value2.flags & Value::VALUE_TYPE_FLOAT) {
-               f -= value2.f;
-               is_int = false;
-           }
-
-           if(is_int) {
-                return Value::new_int(i);
-           } else {
-            return Value::new_float(f);
-           }
-
-        } else {
+        }
+        else {
             assert(false && "function not found");
         }
-  
+
     }
 }
 
 int main() {
-    auto tokens = tokenize("(+ 2 (+ 3 (- 100 120.1)) )"); 
-    std::cout<<"\nAST:\n"<<ast_debug_string(ast_from_tokens(tokens));
-    std::cout<<"\nValue:\n"<<value_debug_string(value_from_ast(ast_from_tokens(tokens)));
+    //force a flush each time IO is done. no more pesky IO stuff >_>
+    std::cout.setf( std::ios_base::unitbuf );
     
+    auto tokens = tokenize("(cdr (1 23 \"bollu\"))");
+    std::cout<<"\nToken: "<<token_debug_string(tokens[1]);
+    std::cout<<"\nAST:\n-----\n"<<ast_debug_string(ast_from_tokens(tokens))<<"\n";
+    std::cout<<"\n\nValue:\n-----\n"<<value_debug_string(value_from_ast(ast_from_tokens(tokens)));
+
     Interpreter interpreter;
     Value evald = eval(value_from_ast(ast_from_tokens(tokens)), interpreter); 
-    std::cout<<"\nEVAL:\n"<<value_debug_string(evald);
+    std::cout<<"\n\nEVAL:\n-----\n"<<value_debug_string(evald);
 
     return 0;
 }

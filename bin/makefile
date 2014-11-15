@@ -1,4 +1,4 @@
-CC = clang -lstdc++ -std=c++11  -I../src 
+CC = clang -lstdc++ -std=c++11  -I../src -g -Wall
 all: run
 
 build: compile
