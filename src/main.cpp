@@ -24,7 +24,7 @@ struct Token {
     };
 
     Flag flags;
-    std::string value;
+    std::string datum;
 
     static Token new_open_brace() {
         Token t;
@@ -38,15 +38,15 @@ struct Token {
         return t;
     }
 
-    static Token new_atom(std::string value) {
-        Token t(value);
+    static Token new_atom(std::string datum) {
+        Token t(datum);
         t.flags = Token::TOKEN_TYPE_ATOM;
         return t;
     }
 
     private:
-    Token() { this->flags = 0; this->value = ""; }
-    Token(std::string value) : value(value), flags(0){};
+    Token() { this->flags = 0; this->datum = ""; }
+    Token(std::string datum) : datum(datum), flags(0){};
 };
 
 Token token_from_string(const std::string &string) {
@@ -70,7 +70,7 @@ std::string token_debug_string(const Token &token) {
         return "CloseBrace";
     }
     else if(token.flags & Token::TOKEN_TYPE_ATOM) {
-        return "Atom: " + token.value + "";
+        return "Atom: " + token.datum + "";
     }
 
     return "UNKNOWN TOKEN TYPE";
@@ -161,7 +161,7 @@ std::deque<Token> tokenize(std::string data) {
 
 struct AST {
     private:
-        AST() { this->flags = 0; this->value = ""; };
+        AST() { this->flags = 0; this->datum = ""; };
 
     public:
 
@@ -170,7 +170,7 @@ struct AST {
             AST_NODE_TYPE_TERMINAL = 1<<2,
         };
 
-        std::string value;
+        std::string datum;
         Flag flags;
         std::vector<AST> children;
 
@@ -178,10 +178,10 @@ struct AST {
             this->children.push_back(child);
         }
 
-        static AST new_terminal_node(std::string value) {
+        static AST new_terminal_node(std::string datum) {
             AST ast;
             ast.flags = AST_NODE_TYPE_TERMINAL;
-            ast.value = value;
+            ast.datum = datum;
 
             return ast;
         }
@@ -196,7 +196,7 @@ struct AST {
 
 std::string ast_debug_string(const AST &ast) {
     if(ast.flags & AST::AST_NODE_TYPE_TERMINAL) {
-        return ast.value;
+        return ast.datum;
     };
 
     std::string debug_string = "[ ";
@@ -222,7 +222,7 @@ AST __ast_from_tokens(std::deque<Token> &tokens) {
 
 
     if(head.flags & Token::TOKEN_TYPE_ATOM) {
-        AST child = AST::new_terminal_node(head.value);
+        AST child = AST::new_terminal_node(head.datum);
         return child;
     }
     else if(head.flags & Token::TOKEN_TYPE_OPEN_BRACE) {
@@ -256,27 +256,27 @@ AST ast_from_tokens(std::deque<Token> tokens) {
     return __ast_from_tokens(tokens_copy);
 }
 
-struct Value;
-Value value_from_ast(const AST &ast);
+struct Datum;
+Datum datum_from_ast(const AST &ast);
 
-struct Value {
-    enum ValueFlags {
-        VALUE_TYPE_INT = 1<<1,
-        VALUE_TYPE_FLOAT = 1<<2,
-        VALUE_TYPE_STRING = 1<<3,
-        VALUE_TYPE_LIST = 1<<4,
-        VALUE_TYPE_VARIABLE = 1<<5,
+struct Datum {
+    enum DatumFlags {
+        DATUM_TYPE_INT = 1<<1,
+        DATUM_TYPE_FLOAT = 1<<2,
+        DATUM_TYPE_STRING = 1<<3,
+        DATUM_TYPE_LIST = 1<<4,
+        DATUM_TYPE_VARIABLE = 1<<5,
     };
 
     long long i;
     long double f;
     std::string s;
-    std::vector<Value> list;
+    std::vector<Datum> list;
 
     Flag flags;
 
     private:
-    Value() {
+    Datum() {
         this->i = -42;
         this->f = -42;
         this->s = "INVALID VALUE";
@@ -285,47 +285,47 @@ struct Value {
 
     public:
 
-    static Value new_int(int i) { 
-        Value v;
-        v.flags = VALUE_TYPE_INT;
+    static Datum new_int(int i) { 
+        Datum v;
+        v.flags = DATUM_TYPE_INT;
         v.i = i;
         return v;
     }
 
-    static Value new_float(float f) { 
-        Value v;
-        v.flags = VALUE_TYPE_FLOAT;
+    static Datum new_float(float f) { 
+        Datum v;
+        v.flags = DATUM_TYPE_FLOAT;
         v.f = f; 
         return v;
     }
 
-    static Value new_string(std::string s) { 
-        Value v;
-        v.flags = VALUE_TYPE_STRING;
+    static Datum new_string(std::string s) { 
+        Datum v;
+        v.flags = DATUM_TYPE_STRING;
         v.s = s;
         return v;
     }
 
-    static Value new_variable(std::string s) { 
-        Value v;
-        v.flags = VALUE_TYPE_VARIABLE;
+    static Datum new_variable(std::string s) { 
+        Datum v;
+        v.flags = DATUM_TYPE_VARIABLE;
         v.s = s;
         return v;
     }
 
-    static Value new_list(std::vector<AST> list_members) {
+    static Datum new_list(std::vector<AST> list_members) {
 
-        Value v;
-        v.flags = VALUE_TYPE_LIST;
+        Datum v;
+        v.flags = DATUM_TYPE_LIST;
         for(auto member: list_members) {
-            v.list.push_back(value_from_ast(member));
+            v.list.push_back(datum_from_ast(member));
         };
         return v;
     }
-    static Value new_list(std::vector<Value> list_members) {
+    static Datum new_list(std::vector<Datum> list_members) {
 
-        Value v;
-        v.flags = VALUE_TYPE_LIST;
+        Datum v;
+        v.flags = DATUM_TYPE_LIST;
         for(auto member: list_members) {
             v.list.push_back(member);
         };
@@ -338,42 +338,42 @@ typedef int (*arith_op_int)(int a, int b);
 typedef float (*arith_op_float)(float a, float b);
 
 struct Interpreter; //forward decl
-Value eval(Value to_eval, Interpreter &interpreter); //forward decl
-Value apply_binary_op(Value eval_list, Interpreter &interpreter, arith_op_int op_int, arith_op_float op_float) {
+Datum eval(Datum to_eval, Interpreter &interpreter); //forward decl
+Datum apply_binary_op(Datum eval_list, Interpreter &interpreter, arith_op_int op_int, arith_op_float op_float) {
 
     //binary operator - has 3 things - the operator and two parameters
-    assert(eval_list.flags & Value::VALUE_TYPE_LIST);
+    assert(eval_list.flags & Datum::DATUM_TYPE_LIST);
     assert(eval_list.list.size() == 3);
 
-    auto value1 = eval(eval_list.list[1], interpreter);
-    auto value2 = eval(eval_list.list[2], interpreter);
+    auto datum1 = eval(eval_list.list[1], interpreter);
+    auto datum2 = eval(eval_list.list[2], interpreter);
 
-    if((value1.flags & Value::VALUE_TYPE_INT) && (value2.flags & Value::VALUE_TYPE_INT)) {
-        std::cout<<"\n\tval1 i: "<<value1.i<<" | val2 i: "<<value2.i;
+    if((datum1.flags & Datum::DATUM_TYPE_INT) && (datum2.flags & Datum::DATUM_TYPE_INT)) {
+        std::cout<<"\n\tval1 i: "<<datum1.i<<" | val2 i: "<<datum2.i;
 
-        int result = op_int(value1.i, value2.i);
+        int result = op_int(datum1.i, datum2.i);
         std::cout<<"\n\tresult: "<<result;
-        return Value::new_int(result);
+        return Datum::new_int(result);
     } else {
         float f1;
-        if(value1.flags & Value::VALUE_TYPE_INT) {
-            f1 = value1.i;
-        } else if (value1.flags & Value::VALUE_TYPE_FLOAT) {
-            f1 = value1.f;
+        if(datum1.flags & Datum::DATUM_TYPE_INT) {
+            f1 = datum1.i;
+        } else if (datum1.flags & Datum::DATUM_TYPE_FLOAT) {
+            f1 = datum1.f;
         } else {
             assert(false && "first parameter is not a number");
         }
 
         float f2;
-        if(value2.flags & Value::VALUE_TYPE_INT) {
-            f2 = value2.i;
-        } else if (value2.flags & Value::VALUE_TYPE_FLOAT) {
-            f2 = value2.f;
+        if(datum2.flags & Datum::DATUM_TYPE_INT) {
+            f2 = datum2.i;
+        } else if (datum2.flags & Datum::DATUM_TYPE_FLOAT) {
+            f2 = datum2.f;
         } else {
             assert(false && "second parameter is not a number");
         }
 
-        return Value::new_float(op_float(f1, f2));
+        return Datum::new_float(op_float(f1, f2));
     }   
 }
 
@@ -409,97 +409,97 @@ T mod_binary_op(T var1, T var2) {
 
 
 
-Value value_from_ast(const AST &ast) {
+Datum datum_from_ast(const AST &ast) {
 
-    std::string value = ast.value;
+    std::string datum = ast.datum;
     if(ast.flags & AST::AST_NODE_TYPE_TERMINAL) {
 
         std::stringstream ss;
-        ss.str(value);
+        ss.str(datum);
         int i; ss>>std::noskipws>>i;
 
         if(!ss.fail() && ss.eof()) {
-            return Value::new_int((int)i);
+            return Datum::new_int((int)i);
         }
 
         //float
         ss.clear();
-        ss.str(value);
+        ss.str(datum);
         float f; ss>>f;
 
         if(!ss.fail() && ss.eof()) {
-            return Value::new_float((float)f);           
+            return Datum::new_float((float)f);           
         }
 
         //string
-        if(value.front() == '\"' && value.back()  == '\"') {
-            return Value::new_string(std::string(value.begin() + 1, value.end() - 1));
+        if(datum.front() == '\"' && datum.back()  == '\"') {
+            return Datum::new_string(std::string(datum.begin() + 1, datum.end() - 1));
         }
 
         //variable
-        return Value::new_variable(value);    
+        return Datum::new_variable(datum);    
 
 
 
     }
     else {
         if(ast.flags & AST::AST_NODE_TYPE_NONTERMINAL) {
-            return Value::new_list(ast.children);
+            return Datum::new_list(ast.children);
         }
         assert(false && "unimplemented");
     }
 }
 
-std::string value_debug_string(const Value &value) {
-    if(value.flags & Value::VALUE_TYPE_INT) {
+std::string datum_debug_string(const Datum &datum) {
+    if(datum.flags & Datum::DATUM_TYPE_INT) {
         std::stringstream ss;
-        ss<<"value int: "<<value.i;
+        ss<<"datum int: "<<datum.i;
 
         return ss.str();
     }
-    if(value.flags & Value::VALUE_TYPE_FLOAT) {
+    if(datum.flags & Datum::DATUM_TYPE_FLOAT) {
         std::stringstream ss;
-        ss<<"value float: "<<value.f;
+        ss<<"datum float: "<<datum.f;
 
         return ss.str();
     }
 
-    if(value.flags & Value::VALUE_TYPE_VARIABLE) {
+    if(datum.flags & Datum::DATUM_TYPE_VARIABLE) {
         std::stringstream ss;
-        ss<<"value variable: |"<<value.s<<"|";
+        ss<<"datum variable: |"<<datum.s<<"|";
 
         return ss.str();
 
     }
 
 
-    if(value.flags & Value::VALUE_TYPE_LIST) {
+    if(datum.flags & Datum::DATUM_TYPE_LIST) {
         std::stringstream ss;
-        ss<<"value list: {";
+        ss<<"datum list: {";
 
-        for(auto child : value.list) {
-            ss<<" "<<value_debug_string(child); 
+        for(auto child : datum.list) {
+            ss<<" "<<datum_debug_string(child); 
         }
         ss<<"}";
 
         return ss.str();
 
     }
-    else if (value.flags & Value::VALUE_TYPE_STRING) {
+    else if (datum.flags & Datum::DATUM_TYPE_STRING) {
         std::stringstream ss;
-        ss<<"value string:|";
-        ss<<value.s<<"| ";
+        ss<<"datum string:|";
+        ss<<datum.s<<"| ";
 
         return ss.str();
     }
 
-    assert(false && "unknown value type");
+    assert(false && "unknown datum type");
 }
 
 
 struct Interpreter;
 struct Environment {
-    std::map<std::string, Value> symbol_table;
+    std::map<std::string, Datum> symbol_table;
     Environment *outer;
 
     public:
@@ -507,10 +507,10 @@ struct Environment {
         this->outer = outer;
     }
 
-    Value get_symbol(std::string symbol_name) {
-        auto value_it = this->symbol_table.find(symbol_name);
+    Datum get_symbol(std::string symbol_name) {
+        auto datum_it = this->symbol_table.find(symbol_name);
 
-        if(value_it == this->symbol_table.end()) {
+        if(datum_it == this->symbol_table.end()) {
             if(this->outer == NULL) {
                 std::cout<<"unable to find symbol: "<<symbol_name;
                 assert(false && "symbol not found");
@@ -520,7 +520,7 @@ struct Environment {
             }
         }
         else {
-            return value_it->second;
+            return datum_it->second;
         }
 
     }
@@ -535,24 +535,24 @@ struct Interpreter {
     }
 };
 
-Value eval(Value to_eval, Interpreter &interpreter) {
-    if(to_eval.flags & Value::VALUE_TYPE_INT) {
+Datum eval(Datum to_eval, Interpreter &interpreter) {
+    if(to_eval.flags & Datum::DATUM_TYPE_INT) {
         return to_eval;
     }
 
-    if(to_eval.flags & Value::VALUE_TYPE_FLOAT) {
+    if(to_eval.flags & Datum::DATUM_TYPE_FLOAT) {
         return to_eval;
     }
 
-    if(to_eval.flags & Value::VALUE_TYPE_STRING) {
+    if(to_eval.flags & Datum::DATUM_TYPE_STRING) {
         return to_eval;
     }
 
-    if(to_eval.flags & Value::VALUE_TYPE_LIST) {
+    if(to_eval.flags & Datum::DATUM_TYPE_LIST) {
         //normal forms and special forms go here
 
         //index 0 must be a function name
-        assert(to_eval.list[0].flags & Value::VALUE_TYPE_VARIABLE);
+        assert(to_eval.list[0].flags & Datum::DATUM_TYPE_VARIABLE);
         std::string function_name = to_eval.list[0].s;
 
 
@@ -576,37 +576,37 @@ Value eval(Value to_eval, Interpreter &interpreter) {
         }
         else if(function_name == "%") {
             assert(to_eval.list.size() == 3 && "- requires 2 operands");
-            assert((to_eval.list[1].flags & Value::VALUE_TYPE_INT));
-            assert((to_eval.list[2].flags & Value::VALUE_TYPE_INT));
+            assert((to_eval.list[1].flags & Datum::DATUM_TYPE_INT));
+            assert((to_eval.list[2].flags & Datum::DATUM_TYPE_INT));
 
 
-            return Value::new_int(to_eval.list[1].i % to_eval.list[2].i);
+            return Datum::new_int(to_eval.list[1].i % to_eval.list[2].i);
         }
         
         else if(function_name == "freeze") {
             assert(to_eval.list.size() == 2 && "requires 1 operand");
-            assert(to_eval.list[1].flags & Value::VALUE_TYPE_LIST);
+            assert(to_eval.list[1].flags & Datum::DATUM_TYPE_LIST);
 
             return to_eval.list[1];
         }
     
         else if (function_name == "car") {
             assert(to_eval.list.size() == 2 && "requires 1 operand");
-            assert(to_eval.list[1].flags & Value::VALUE_TYPE_LIST);
+            assert(to_eval.list[1].flags & Datum::DATUM_TYPE_LIST);
 
        
-            Value list_param = to_eval.list[1];
-            Value car = list_param.list[0];
+            Datum list_param = to_eval.list[1];
+            Datum car = list_param.list[0];
             return car;
         }
         else if(function_name == "cdr") {
              assert(to_eval.list.size() == 2 && "requires 1 operand");
-            assert(to_eval.list[1].flags & Value::VALUE_TYPE_LIST);
+            assert(to_eval.list[1].flags & Datum::DATUM_TYPE_LIST);
 
-            Value list_param = to_eval.list[1];
-            std::vector<Value> cdr(list_param.list.begin() + 1, list_param.list.end());
+            Datum list_param = to_eval.list[1];
+            std::vector<Datum> cdr(list_param.list.begin() + 1, list_param.list.end());
             
-            return Value::new_list(cdr);
+            return Datum::new_list(cdr);
 
         }
         else {
@@ -623,11 +623,11 @@ int main() {
     auto tokens = tokenize("(cdr (1 23 \"bollu\"))");
     std::cout<<"\nToken: "<<token_debug_string(tokens[1]);
     std::cout<<"\nAST:\n-----\n"<<ast_debug_string(ast_from_tokens(tokens))<<"\n";
-    std::cout<<"\n\nValue:\n-----\n"<<value_debug_string(value_from_ast(ast_from_tokens(tokens)));
+    std::cout<<"\n\nDatum:\n-----\n"<<datum_debug_string(datum_from_ast(ast_from_tokens(tokens)));
 
     Interpreter interpreter;
-    Value evald = eval(value_from_ast(ast_from_tokens(tokens)), interpreter); 
-    std::cout<<"\n\nEVAL:\n-----\n"<<value_debug_string(evald);
+    Datum evald = eval(datum_from_ast(ast_from_tokens(tokens)), interpreter); 
+    std::cout<<"\n\nEVAL:\n-----\n"<<datum_debug_string(evald);
 
     return 0;
 }
