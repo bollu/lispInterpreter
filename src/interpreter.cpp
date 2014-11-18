@@ -226,9 +226,6 @@ Datum Interpreter::eval(Datum to_eval) {
             return Datum::new_symbol("freeze");
         }
 
-
-
-        std::cout<<"\n>>looking for: "<<variable_name<<"\n";
         Datum value = this->current_envt.get_symbol(variable_name);
 
         return value;
@@ -252,7 +249,6 @@ Datum Interpreter::eval(Datum to_eval) {
         }
 
         
-        std::cout<<"\n>>function call raw: "<<datum_debug_string(to_eval.list[0])<<" | value: "<<datum_debug_string(function_call_variable)<<"\n";
         assert(function_call_variable.flags & Datum::DATUM_TYPE_SYMBOL);
 
         std::string function_name = function_call_variable.s;
@@ -279,8 +275,6 @@ Datum Interpreter::eval(Datum to_eval) {
                 return this->eval(to_eval.list[2]);
 
             } else {
-                std::cout<<"\n\nconditional false\n\n";
-
                 if (to_eval.list.size() == 4) {
                     return this->eval(to_eval.list[3]);
                 } else {
@@ -298,7 +292,6 @@ Datum Interpreter::eval(Datum to_eval) {
             Datum value = this->eval(to_eval.list[2]);
 
             this->current_envt.set_symbol(name, value);
-            std::cout<<"\n>>envt changed:\n"<<environment_debug_string(this->current_envt);
             return value;
         }
         else if(function_name == "\\" || function_name == "lambda") {
@@ -400,13 +393,8 @@ Datum Interpreter::eval(Datum to_eval) {
         else {
 
             //custom function
-            std::cout<<"\n>>"<<"looking for custom function "<<function_name<<"\n";
 
             Datum function_datum = this->current_envt.get_symbol(function_name);
-            
-            std::cout<<"\n>>"<<"found function: "<<function_name<<"\n";
-            std::cout<<"\n>>definition:\n"<<datum_debug_string(function_datum);
-
             assert(function_datum.flags & Datum::DATUM_TYPE_LAMBDA);
            
             return eval_function(function_datum, params, *this);
@@ -416,3 +404,6 @@ Datum Interpreter::eval(Datum to_eval) {
     }
 
 }
+
+
+
